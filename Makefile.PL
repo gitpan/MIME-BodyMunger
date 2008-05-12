@@ -1,0 +1,13 @@
+use inc::Module::Install;
+all_from 'lib/MIME/BodyMunger.pm';
+
+requires 'Encode';
+requires 'Variable::Magic';
+
+test_requires 'File::Temp';
+test_requires 'MIME::Entity';
+test_requires 'MIME::Parser';
+
+extra_tests;
+
+WriteAll;
