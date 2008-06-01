@@ -2,7 +2,7 @@ use strict;
 use warnings;
 package MIME::BodyMunger;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 use Carp ();
 use Encode;
@@ -14,7 +14,7 @@ MIME::BodyMunger - rewrite the content of text parts, minding charset
 
 =head1 VERSION
 
-version 0.001
+version 0.002
 
 =head1 SYNOPSIS
 
@@ -65,16 +65,24 @@ sub rewrite_content {
   my $charset = $entity->head->mime_attr('content-type.charset')
              || 'ISO-8859-1';
 
+  $charset = 'MacRoman' if lc $charset eq 'macintosh';
+
+  Carp::carp(qq{rewriting message in unknown charset "$charset"})
+    unless my $known_charset = Encode::find_encoding($charset);
+
   my $changed = 0;
   my $got_set = Variable::Magic::wizard(set => sub { $changed = 1 });
 
-  my $body = Encode::decode($charset, $entity->bodyhandle->as_string);
+  my $body = $known_charset
+           ? Encode::decode($charset, $entity->bodyhandle->as_string)
+           : $entity->bodyhandle->as_string;
+
   Variable::Magic::cast($body, $got_set);
   $code->(\$body, $entity);
 
   if ($changed) {
     my $io = $entity->open('w');
-    $io->print(Encode::encode($charset, $body));
+    $io->print($known_charset ? Encode::encode($charset, $body) : $body);
   }
 }
 
@@ -101,13 +109,18 @@ sub rewrite_lines {
   my $charset = $entity->head->mime_attr('content-type.charset')
              || 'ISO-8859-1';
 
+  $charset = 'MacRoman' if lc $charset eq 'macintosh';
+
+  Carp::carp(qq{rewriting message in unknown charset "$charset"})
+    unless my $known_charset = Encode::find_encoding($charset);
+
   my $changed = 0;
   my $got_set = Variable::Magic::wizard(set => sub { $changed = 1 });
 
   my @lines = $entity->bodyhandle->as_lines;
 
   for my $line (@lines) {
-    local $_ = Encode::decode($charset, $line);
+    local $_ = $known_charset ? Encode::decode($charset, $line) : $line;
     Variable::Magic::cast($_, $got_set);
     $code->(\$_, $entity);
     Variable::Magic::dispell($_, $got_set);
@@ -116,7 +129,7 @@ sub rewrite_lines {
 
   if ($changed) {
     my $io = $entity->open('w');
-    $io->print(Encode::encode($charset, $_)) for @lines;
+    $io->print($known_charset ? Encode::encode($charset, $_) : $_) for @lines;
   }
 }
 
@@ -128,6 +141,8 @@ Ricardo SIGNES, C<< <rjbs@cpan.org> >>
 
 Thanks to Pobox.com and Listbox.com, who sponsored the development of this
 module.
+
+Thanks to Brian Cassidy for writing some tests for the initial release.
 
 =head1 BUGS
 

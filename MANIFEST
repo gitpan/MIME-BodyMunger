@@ -1,6 +1,7 @@
 Changes
 eg/base64.msg
 eg/boring.msg
+eg/macroman.msg
 eg/multi.msg
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
