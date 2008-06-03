@@ -3,6 +3,7 @@ eg/base64.msg
 eg/boring.msg
 eg/macroman.msg
 eg/multi.msg
+eg/nested.msg
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
