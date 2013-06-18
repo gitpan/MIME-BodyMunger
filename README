@@ -1,7 +1,13 @@
-# Copyright (c) 2008 by Ricardo SIGNES. All rights reserved.
-# Licensed under terms of Perl itself (the "License").
-# You may not use this file except in compliance with the License.
-# A copy of the License was distributed with this file or you may obtain a 
-# copy of the License from http://dev.perl.org/licenses/
+
+
+This archive contains the distribution MIME-BodyMunger,
+version 0.005:
+
+  rewrite the content of text parts, minding charset
+
+This software is copyright (c) 2008 by Ricardo SIGNES.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 

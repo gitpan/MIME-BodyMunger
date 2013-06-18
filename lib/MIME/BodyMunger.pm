@@ -1,12 +1,86 @@
 use strict;
 use warnings;
 package MIME::BodyMunger;
-
-our $VERSION = '0.004';
+{
+  $MIME::BodyMunger::VERSION = '0.005';
+}
+# ABSTRACT: rewrite the content of text parts, minding charset
 
 use Carp ();
 use Encode;
 use Variable::Magic ();
+
+
+sub rewrite_content {
+  my ($self, $entity, $code) = @_;
+
+  Carp::confess "rewrite_content called on non-text part"
+    unless $entity->effective_type =~ qr{\Atext/(?:html|plain)(?:$|;)}i;
+
+  my $charset = $entity->head->mime_attr('content-type.charset')
+             || 'ISO-8859-1';
+
+  $charset = 'MacRoman' if lc $charset eq 'macintosh';
+
+  Carp::carp(qq{rewriting message in unknown charset "$charset"})
+    unless my $known_charset = Encode::find_encoding($charset);
+
+  my $changed = 0;
+  my $got_set = Variable::Magic::wizard(set => sub { $changed = 1 });
+
+  my $body = $known_charset
+           ? Encode::decode($charset, $entity->bodyhandle->as_string)
+           : $entity->bodyhandle->as_string;
+
+  Variable::Magic::cast($body, $got_set);
+  $code->(\$body, $entity);
+
+  if ($changed) {
+    my $io = $entity->open('w');
+    $io->print($known_charset ? Encode::encode($charset, $body) : $body);
+  }
+}
+
+
+sub rewrite_lines {
+  my ($self, $entity, $code) = @_;
+
+  Carp::confess "rewrite_lines called on non-text part"
+    unless $entity->effective_type =~ qr{\Atext/(?:html|plain)(?:$|;)}i;
+
+  my $charset = $entity->head->mime_attr('content-type.charset')
+             || 'ISO-8859-1';
+
+  $charset = 'MacRoman' if lc $charset eq 'macintosh';
+
+  Carp::carp(qq{rewriting message in unknown charset "$charset"})
+    unless my $known_charset = Encode::find_encoding($charset);
+
+  my $changed = 0;
+  my $got_set = Variable::Magic::wizard(set => sub { $changed = 1 });
+
+  my @lines = $entity->bodyhandle->as_lines;
+
+  for my $line (@lines) {
+    local $_ = $known_charset ? Encode::decode($charset, $line) : $line;
+    Variable::Magic::cast($_, $got_set);
+    $code->(\$_, $entity);
+    Variable::Magic::dispell($_, $got_set);
+    $line = $_;
+  };
+
+  if ($changed) {
+    my $io = $entity->open('w');
+    $io->print($known_charset ? Encode::encode($charset, $_) : $_) for @lines;
+  }
+}
+
+
+1;
+
+__END__
+
+=pod
 
 =head1 NAME
 
@@ -14,7 +88,7 @@ MIME::BodyMunger - rewrite the content of text parts, minding charset
 
 =head1 VERSION
 
-version 0.004
+version 0.005
 
 =head1 SYNOPSIS
 
@@ -54,38 +128,6 @@ The callback is invoked like this:
 
 In the future, there should be an option to re-encode to an alternate charset.
 
-=cut
-
-sub rewrite_content {
-  my ($self, $entity, $code) = @_;
-
-  Carp::confess "rewrite_content called on non-text part"
-    unless $entity->effective_type =~ qr{\Atext/(?:html|plain)(?:$|;)}i;
-
-  my $charset = $entity->head->mime_attr('content-type.charset')
-             || 'ISO-8859-1';
-
-  $charset = 'MacRoman' if lc $charset eq 'macintosh';
-
-  Carp::carp(qq{rewriting message in unknown charset "$charset"})
-    unless my $known_charset = Encode::find_encoding($charset);
-
-  my $changed = 0;
-  my $got_set = Variable::Magic::wizard(set => sub { $changed = 1 });
-
-  my $body = $known_charset
-           ? Encode::decode($charset, $entity->bodyhandle->as_string)
-           : $entity->bodyhandle->as_string;
-
-  Variable::Magic::cast($body, $got_set);
-  $code->(\$body, $entity);
-
-  if ($changed) {
-    my $io = $entity->open('w');
-    $io->print($known_charset ? Encode::encode($charset, $body) : $body);
-  }
-}
-
 =head2 rewrite_lines
 
   MIME::BodyMunger->rewrite_lines($message, sub { ... });
@@ -98,45 +140,6 @@ per line, like this:
 
 If any line is changed, the entire body will be reencoded and updated.
 
-=cut
-
-sub rewrite_lines {
-  my ($self, $entity, $code) = @_;
-
-  Carp::confess "rewrite_lines called on non-text part"
-    unless $entity->effective_type =~ qr{\Atext/(?:html|plain)(?:$|;)}i;
-
-  my $charset = $entity->head->mime_attr('content-type.charset')
-             || 'ISO-8859-1';
-
-  $charset = 'MacRoman' if lc $charset eq 'macintosh';
-
-  Carp::carp(qq{rewriting message in unknown charset "$charset"})
-    unless my $known_charset = Encode::find_encoding($charset);
-
-  my $changed = 0;
-  my $got_set = Variable::Magic::wizard(set => sub { $changed = 1 });
-
-  my @lines = $entity->bodyhandle->as_lines;
-
-  for my $line (@lines) {
-    local $_ = $known_charset ? Encode::decode($charset, $line) : $line;
-    Variable::Magic::cast($_, $got_set);
-    $code->(\$_, $entity);
-    Variable::Magic::dispell($_, $got_set);
-    $line = $_;
-  };
-
-  if ($changed) {
-    my $io = $entity->open('w');
-    $io->print($known_charset ? Encode::encode($charset, $_) : $_) for @lines;
-  }
-}
-
-=head1 AUTHOR
-
-Ricardo SIGNES, C<< <rjbs@cpan.org> >>
-
 =head1 THANKS
 
 Thanks to Pobox.com and Listbox.com, who sponsored the development of this
@@ -144,17 +147,15 @@ module.
 
 Thanks to Brian Cassidy for writing some tests for the initial release.
 
-=head1 BUGS
+=head1 AUTHOR
 
-Please report any bugs or feature requests through the web interface at
-L<http://rt.cpan.org>. I will be notified, and then you'll automatically be
-notified of progress on your bug as I make changes.
+Ricardo SIGNES <rjbs@cpan.org>
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT AND LICENSE
 
-Copyright 2008, Ricardo SIGNES.  This program is free software;  you can
-redistribute it and/or modify it under the same terms as Perl itself.
+This software is copyright (c) 2008 by Ricardo SIGNES.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-1;

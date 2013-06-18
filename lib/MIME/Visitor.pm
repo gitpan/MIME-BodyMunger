@@ -1,11 +1,72 @@
 use strict;
 use warnings;
 package MIME::Visitor;
-
-our $VERSION = '0.004';
+{
+  $MIME::Visitor::VERSION = '0.005';
+}
+# ABSTRACT: walk through MIME parts and do stuff (like rewrite)
 
 use Encode;
 use MIME::BodyMunger;
+
+
+sub walk_parts {
+  my ($self, $root, $code) = @_;
+
+  $code->($root);
+  for my $part ($root->parts) {
+    $self->walk_parts($part, $code);
+  }
+}
+
+
+sub walk_leaves {
+  my ($self, $root, $code) = @_;
+
+  $self->walk_parts(
+    $root,
+    sub {
+      return if $_[0]->is_multipart;
+      $code->($_[0]);
+    },
+  );
+}
+
+
+sub walk_text_leaves {
+  my ($self, $root, $code) = @_;
+  $self->walk_leaves($root, sub {
+    return unless $_[0]->effective_type =~ qr{\Atext/(?:html|plain)(?:$|;)}i;
+    $code->($_[0]);
+  });
+}
+
+
+sub rewrite_parts {
+  my ($self, $root, $code) = @_;
+
+  $self->walk_text_leaves($root, sub {
+    my ($part) = @_;
+    MIME::BodyMunger->rewrite_content($part, $code);
+  });
+}
+
+
+sub rewrite_all_lines {
+  my ($self, $root, $code) = @_;
+
+  $self->walk_text_leaves($root, sub {
+    my ($part) = @_;
+    MIME::BodyMunger->rewrite_lines($part, $code);
+  });
+}
+
+
+1;
+
+__END__
+
+=pod
 
 =head1 NAME
 
@@ -13,7 +74,7 @@ MIME::Visitor - walk through MIME parts and do stuff (like rewrite)
 
 =head1 VERSION
 
-version 0.004
+version 0.005
 
 =head1 SYNOPSIS
 
@@ -48,17 +109,6 @@ added in the future.
 This method calls the given code on every part of the given root message,
 including the root itself.
 
-=cut
-
-sub walk_parts {
-  my ($self, $root, $code) = @_;
-
-  $code->($root);
-  for my $part ($root->parts) {
-    $self->walk_parts($part, $code);
-  }
-}
-
 =head2 walk_leaves
 
   MIME::Visitor->walk_leaves($root, sub { ... });
@@ -67,36 +117,12 @@ This method calls the given code on every leaf part of the given root message.
 It descends into multipart parts of the message without calling the callback on
 them.
 
-=cut
-
-sub walk_leaves {
-  my ($self, $root, $code) = @_;
-
-  $self->walk_parts(
-    $root,
-    sub {
-      return if $_[0]->is_multipart;
-      $code->($_[0]);
-    },
-  );
-}
-
 =head2 walk_text_leaves
 
   MIME::Visitor->walk_text_leaves($root, sub { ... });
 
 This method behaves like C<walk_leaves>, but only calls the callback on parts
 with a content type of text/plain or text/html.
-
-=cut
-
-sub walk_text_leaves {
-  my ($self, $root, $code) = @_;
-  $self->walk_leaves($root, sub {
-    return unless $_[0]->effective_type =~ qr{\Atext/(?:html|plain)(?:$|;)}i;
-    $code->($_[0]);
-  });
-}
 
 =head2 rewrite_parts
 
@@ -109,17 +135,6 @@ the parts.  For each text leaf, the callback is invoked like this:
 
 For more information, see L<MIME::BodyMunger/rewrite_content>.
 
-=cut
-
-sub rewrite_parts {
-  my ($self, $root, $code) = @_;
-
-  $self->walk_text_leaves($root, sub {
-    my ($part) = @_;
-    MIME::BodyMunger->rewrite_content($part, $code);
-  });
-}
-
 =head2 rewrite_all_lines
 
   MIME::Visitor->rewrite_all_lines($root, sub { ... });
@@ -127,37 +142,20 @@ sub rewrite_parts {
 This method behaves like C<rewrite_parts>, but the callback is called for each
 line of each relevant part, rather than for the part's body as a whole.
 
-=cut
-
-sub rewrite_all_lines {
-  my ($self, $root, $code) = @_;
-
-  $self->walk_text_leaves($root, sub {
-    my ($part) = @_;
-    MIME::BodyMunger->rewrite_lines($part, $code);
-  });
-}
-
-=head1 AUTHOR
-
-Ricardo SIGNES, C<< <rjbs@cpan.org> >>
-
 =head1 THANKS
 
 Thanks to Pobox.com and Listbox.com, who sponsored the development of this
 module.
 
-=head1 BUGS
+=head1 AUTHOR
 
-Please report any bugs or feature requests through the web interface at
-L<http://rt.cpan.org>. I will be notified, and then you'll automatically be
-notified of progress on your bug as I make changes.
+Ricardo SIGNES <rjbs@cpan.org>
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT AND LICENSE
 
-Copyright 2008, Ricardo SIGNES.  This program is free software;  you can
-redistribute it and/or modify it under the same terms as Perl itself.
+This software is copyright (c) 2008 by Ricardo SIGNES.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-1;
