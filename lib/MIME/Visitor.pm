@@ -2,7 +2,7 @@ use strict;
 use warnings;
 package MIME::Visitor;
 {
-  $MIME::Visitor::VERSION = '0.005';
+  $MIME::Visitor::VERSION = '0.006';
 }
 # ABSTRACT: walk through MIME parts and do stuff (like rewrite)
 
@@ -74,7 +74,7 @@ MIME::Visitor - walk through MIME parts and do stuff (like rewrite)
 
 =head1 VERSION
 
-version 0.005
+version 0.006
 
 =head1 SYNOPSIS
 

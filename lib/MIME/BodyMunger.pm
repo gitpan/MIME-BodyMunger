@@ -2,7 +2,7 @@ use strict;
 use warnings;
 package MIME::BodyMunger;
 {
-  $MIME::BodyMunger::VERSION = '0.005';
+  $MIME::BodyMunger::VERSION = '0.006';
 }
 # ABSTRACT: rewrite the content of text parts, minding charset
 
@@ -88,7 +88,7 @@ MIME::BodyMunger - rewrite the content of text parts, minding charset
 
 =head1 VERSION
 
-version 0.005
+version 0.006
 
 =head1 SYNOPSIS
 
